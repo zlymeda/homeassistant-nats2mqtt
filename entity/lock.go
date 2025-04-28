@@ -8,6 +8,7 @@ var _ Metadata = LockMeta{}
 
 type LockMeta struct {
 	Meta
+	Optimistic bool
 }
 
 func (l LockMeta) GetId() string {
@@ -23,7 +24,9 @@ func (l LockMeta) GetExtraTopics() []string {
 }
 
 func (l LockMeta) ToHaDiscovery(dev Device) map[string]any {
-	return l.Meta.ToHaDiscovery(dev, "lock")
+	result := l.Meta.ToHaDiscovery(dev, "lock")
+	result["opt"] = l.Optimistic
+	return result
 }
 
 type LockState string
@@ -34,7 +37,7 @@ const (
 )
 
 type Lock struct {
-	Meta       observable.Observable[Meta]
+	Meta       observable.Observable[LockMeta]
 	State      observable.Observable[LockState]
 	Attributes observable.Observable[Attrs]
 

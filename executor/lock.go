@@ -6,10 +6,8 @@ import (
 )
 
 func (s *EntityRegistry) AddLock(e *entity.Lock) error {
-	lockMeta := observable.NewMapped(e.Meta, func(i entity.Meta) entity.Metadata {
-		return entity.LockMeta{
-			Meta: i,
-		}
+	lockMeta := observable.NewMapped(e.Meta, func(i entity.LockMeta) entity.Metadata {
+		return i
 	})
 
 	s.register(entity.Entity{

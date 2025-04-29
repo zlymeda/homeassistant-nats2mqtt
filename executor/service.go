@@ -47,19 +47,14 @@ func (s *Service) Start() {
 
 	}
 
-	publish := func() {
+	publishStates := func() {
 		if err := s.PublishStates(); err != nil {
 			slog.Error("publishing states", slog.Any("err", err))
 			doRetry()
 		}
 	}
 
-	_, _ = s.nc.Subscribe("homeassistant.status", func(msg *nats.Msg) {
-		status := string(msg.Data)
-		if status != "online" {
-			return
-		}
-
+	publishDiscovery := func() {
 		for i := 0; i < 10; i++ {
 			if err := s.PublishDiscovery(); err != nil {
 				slog.Error("publishing discovery", slog.Any("err", err))
@@ -73,10 +68,19 @@ func (s *Service) Start() {
 		// give HA time to subscribe on the topics
 		time.Sleep(5 * time.Second)
 
-		publish()
+		publishStates()
+	}
+
+	_, _ = s.nc.Subscribe("homeassistant.status", func(msg *nats.Msg) {
+		status := string(msg.Data)
+		if status != "online" {
+			return
+		}
+
+		publishDiscovery()
 	})
 
-	publish()
+	publishDiscovery()
 
 	for {
 		select {
@@ -84,11 +88,11 @@ func (s *Service) Start() {
 			return
 
 		case <-time.After(5 * time.Minute):
-			publish()
+			publishStates()
 
 		case <-retry:
 			microSleep()
-			publish()
+			publishStates()
 		}
 	}
 }

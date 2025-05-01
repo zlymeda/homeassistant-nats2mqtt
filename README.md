@@ -1,12 +1,14 @@
 # homeassistant-nats2mqtt
 
-A Golang library that bridges NATS messaging with Home Assistant MQTT integration, enabling seamless device and entity management through auto-discovery.
+A Golang library that bridges [NATS](https://nats.io/) messaging with Home Assistant MQTT 
+integration, enabling 
+seamless device and entity management through auto-discovery.
 
 The main goal is not to pollute Home Assistant with more and more integrations. Instead, this library enables you to run separate services written in Go that can operate independently from Home Assistant, be restarted without affecting HA, and don't have to be written in Python.
 
 ## Overview
 
-This library allows you to define Home Assistant entities in Go code and automatically publish them to Home Assistant using NATS as the underlying transport mechanism. It handles the MQTT discovery protocol, state monitoring, and command processing, making it easy to integrate custom devices with Home Assistant.
+This library allows you to define Home Assistant entities in Go code and automatically publish them to Home Assistant using [NATS](https://nats.io/) as the underlying transport mechanism. It handles the MQTT discovery protocol, state monitoring, and command processing, making it easy to integrate custom devices with Home Assistant.
 
 ## Features
 
@@ -39,7 +41,7 @@ The library consists of several key components:
 
 1. Entity definitions - Go structs that define different types of Home Assistant entities
 1. Observable pattern - For tracking state changes
-1. Service executor - Manages NATS connections and handles message publishing/subscribing
+1. Service executor - Manages [NATS](https://nats.io/) connections and handles message publishing/subscribing
 1. Entity registry - Tracks entities for a device and manages their lifecycle
 
 ## Usage
@@ -201,7 +203,7 @@ updateMeta := func() {
 
 ## NATS and MQTT
 
-This library uses NATS as the messaging system but publishes messages in a format compatible 
+This library uses [NATS](https://nats.io/) as the messaging system but publishes messages in a format compatible 
 with Home Assistant's MQTT integration. It is compatible with existing Home Assistant MQTT 
 discovery.
 

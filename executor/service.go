@@ -17,6 +17,7 @@ func New(ctx context.Context, origin Origin, nc *nats.Conn) *Service {
 		nc:      nc,
 		origin:  origin,
 		devices: map[string]*EntityRegistry{},
+		updates: make(chan struct{}, 1),
 	}
 }
 
@@ -29,6 +30,8 @@ type Service struct {
 	mutex sync.Mutex
 
 	devices map[string]*EntityRegistry
+
+	updates chan struct{}
 }
 
 func (s *Service) Start() {
@@ -93,6 +96,9 @@ func (s *Service) Start() {
 		case <-retry:
 			microSleep()
 			publishStates()
+
+		case <-s.updates:
+			publishDiscovery()
 		}
 	}
 }

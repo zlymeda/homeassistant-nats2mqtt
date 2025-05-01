@@ -25,6 +25,8 @@ type EntityRegistry struct {
 
 	publishState []func() error
 	origin       Origin
+
+	stateUpdated func()
 }
 
 func (s *EntityRegistry) PublishDiscovery() error {
@@ -166,6 +168,7 @@ func (s *EntityRegistry) register(e entity.Entity) {
 	s.monitorState(e)
 	s.monitorAttributes(e)
 	s.monitorDiscovery(e)
+	s.stateUpdated()
 }
 
 func monitorObservable[T any](s *EntityRegistry, meta entity.Metadata, observable observable.Observable[T], publish func(state T) error) {

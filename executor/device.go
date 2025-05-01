@@ -24,7 +24,19 @@ func (s *Service) AddDevice(device entity.Device) *EntityRegistry {
 		device:      device,
 		topicPrefix: Topic(s.origin.Name, device.Id),
 		origin:      s.origin,
+		stateUpdated: func() {
+			s.stateUpdated()
+		},
 	}
 
+	s.stateUpdated()
+
 	return s.devices[device.Id]
+}
+
+func (s *Service) stateUpdated() {
+	select {
+	case s.updates <- struct{}{}:
+	default:
+	}
 }

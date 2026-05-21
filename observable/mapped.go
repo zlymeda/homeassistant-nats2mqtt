@@ -2,7 +2,6 @@ package observable
 
 import (
 	"log/slog"
-	"time"
 )
 
 var _ Observable[string] = &mappedObservable[int64, string]{}
@@ -29,15 +28,14 @@ func (m *mappedObservable[I, O]) Changes() <-chan O {
 		return nil
 	}
 
-	out := make(chan O, 1) // Buffer of 1 to prevent blocking
+	out := make(chan O, 1)
 
 	go func() {
 		defer close(out)
 		for v := range in {
 			select {
 			case out <- m.mapper(v):
-
-			case <-time.After(1 * time.Second):
+			default:
 				slog.Debug("mappedObservable: discarding event as the channel is full")
 			}
 		}

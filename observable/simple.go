@@ -2,8 +2,10 @@ package observable
 
 import (
 	"context"
-	"github.com/zlymeda/homeassistant-nats2mqtt/internal/fanner"
+	"log/slog"
 	"sync"
+
+	"github.com/zlymeda/homeassistant-nats2mqtt/internal/fanner"
 )
 
 var _ Observable[string] = &Simple[string]{}
@@ -18,7 +20,7 @@ func NewSimple[T any](ctx context.Context, state T) *Simple[T] {
 }
 
 type Simple[T any] struct {
-	mutex sync.Mutex
+	mutex sync.RWMutex
 
 	state          T
 	states         chan T
@@ -27,15 +29,22 @@ type Simple[T any] struct {
 
 func (s *Simple[T]) Change(state T) {
 	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	s.state = state
-	s.states <- state
+	s.mutex.Unlock()
+
+	// Send on channel without holding the mutex to avoid deadlock.
+	// Non-blocking: if the fan-out goroutine hasn't drained the previous
+	// event yet, we discard this one (consumers will get the latest via Current()).
+	select {
+	case s.states <- state:
+	default:
+		slog.Debug("observable: discarding intermediate state change, fan-out buffer full")
+	}
 }
 
 func (s *Simple[T]) Current() T {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 
 	return s.state
 }

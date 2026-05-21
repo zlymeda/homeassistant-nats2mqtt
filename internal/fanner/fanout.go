@@ -4,12 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"sync"
-	"time"
 )
 
 func FanOut[E any](ctx context.Context, events <-chan E) func(buffer int) <-chan E {
 	var consumers []chan E
-	var mutex sync.Mutex
+	var mutex sync.RWMutex
 
 	go func() {
 		defer func() {
@@ -17,6 +16,7 @@ func FanOut[E any](ctx context.Context, events <-chan E) func(buffer int) <-chan
 			for _, ch := range consumers {
 				close(ch)
 			}
+			consumers = nil
 			mutex.Unlock()
 		}()
 
@@ -32,21 +32,23 @@ func FanOut[E any](ctx context.Context, events <-chan E) func(buffer int) <-chan
 					return
 				}
 
-				mutex.Lock()
-				activeConsumers := make([]chan E, 0, len(consumers))
-				for _, ch := range consumers {
+				// Take a snapshot of consumers under a read lock to minimize lock hold time.
+				mutex.RLock()
+				snapshot := make([]chan E, len(consumers))
+				copy(snapshot, consumers)
+				mutex.RUnlock()
+
+				// Distribute to consumers without holding the lock.
+				// Use non-blocking send: discard event for slow consumers
+				// but keep the consumer registered (don't evict).
+				for _, ch := range snapshot {
 					select {
 					case ch <- event:
-						activeConsumers = append(activeConsumers, ch)
-					case <-time.After(1 * time.Second):
-						// If the consumer channel is full, discard the event
-						slog.Warn("fanout: discarding event as the channel is full",
+					default:
+						slog.Warn("fanout: discarding event for slow consumer",
 							slog.Any("event", event))
 					}
 				}
-
-				consumers = activeConsumers
-				mutex.Unlock()
 			}
 		}
 	}()

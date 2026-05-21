@@ -2,8 +2,9 @@ package executor
 
 import (
 	"fmt"
-	"github.com/nats-io/nats.go"
 	"log/slog"
+
+	"github.com/nats-io/nats.go"
 )
 
 func (s *EntityRegistry) monitorCommandsOn(cmdTopic string, callback func([]byte) error) error {
@@ -25,31 +26,35 @@ func (s *EntityRegistry) monitorCommandsOn(cmdTopic string, callback func([]byte
 
 	})
 
+	if err != nil {
+		return err
+	}
+
 	go func() {
 		<-s.ctx.Done()
 		_ = sub.Unsubscribe()
 	}()
 
-	return err
+	return nil
 }
 
-func createCallback(callback map[string]func() error) func([]byte) error {
+func createCallback(entityType string, callback map[string]func() error) func([]byte) error {
 	return func(body []byte) error {
 		cmd := string(body)
 		fce, ok := callback[cmd]
 		if !ok {
 			slog.Warn("unknown mqtt command",
 				slog.String("cmd", cmd),
-				slog.String("type", "alarm"),
+				slog.String("type", entityType),
 			)
-			return fmt.Errorf("unknown mqtt command")
+			return fmt.Errorf("unknown mqtt command: %s", cmd)
 		}
 		if fce == nil {
 			slog.Warn("mqtt command not bound",
 				slog.String("cmd", cmd),
-				slog.String("type", "alarm"),
+				slog.String("type", entityType),
 			)
-			return fmt.Errorf("mqtt command not bound")
+			return fmt.Errorf("mqtt command not bound: %s", cmd)
 		}
 		return fce()
 	}

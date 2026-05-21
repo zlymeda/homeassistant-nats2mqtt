@@ -2,20 +2,21 @@ package executor
 
 import (
 	"errors"
+
 	"github.com/shopspring/decimal"
 	"github.com/zlymeda/homeassistant-nats2mqtt/entity"
 	"github.com/zlymeda/homeassistant-nats2mqtt/observable"
 )
 
 func (s *EntityRegistry) AddClimate(e *entity.Climate) error {
-	s.registerClimate(e)
+	climateMeta := s.registerClimate(e)
 
-	meta := e.Meta.Current()
+	meta := climateMeta.Current()
 
-	s.monitorDecimal(meta, e.ActualTemperature, entity.ClimateCurrentTemperatureTopic)
-	s.monitorDecimal(meta, e.RequestedTemperature, entity.ClimateTemperatureStateTopic)
-	s.monitorString(meta, e.Mode, entity.ClimateModeStateTopic)
-	s.monitorString(meta, e.PresetMode, entity.ClimatePresetModeStateTopic)
+	s.monitorDecimal(climateMeta, e.ActualTemperature, entity.ClimateCurrentTemperatureTopic)
+	s.monitorDecimal(climateMeta, e.RequestedTemperature, entity.ClimateTemperatureStateTopic)
+	s.monitorString(climateMeta, e.Mode, entity.ClimateModeStateTopic)
+	s.monitorString(climateMeta, e.PresetMode, entity.ClimatePresetModeStateTopic)
 
 	err1 := s.monitorDecimalCmd(meta, e.SetTemperature, entity.ClimateTemperatureCommandTopic)
 	err2 := s.monitorStringCmd(meta, e.SetMode, entity.ClimateModeCommandTopic)
@@ -24,44 +25,48 @@ func (s *EntityRegistry) AddClimate(e *entity.Climate) error {
 	return errors.Join(err1, err2, err3)
 }
 
-func (s *EntityRegistry) registerClimate(e *entity.Climate) {
+func (s *EntityRegistry) registerClimate(e *entity.Climate) observable.Observable[entity.Metadata] {
+	climateMeta := observable.NewMapped(e.Meta, func(i entity.ClimateMeta) entity.Metadata {
+
+		i.ExtraTopics.AddIfNotNull(e.ActualTemperature, entity.ClimateCurrentTemperatureTopic)
+		i.ExtraTopics.AddIfNotNull(e.RequestedTemperature, entity.ClimateTemperatureStateTopic)
+		i.ExtraTopics.AddIfNotNull(e.Mode, entity.ClimateModeStateTopic)
+		i.ExtraTopics.AddIfNotNull(e.PresetMode, entity.ClimatePresetModeStateTopic)
+		i.ExtraTopics.AddIfNotNull(e.SetTemperature, entity.ClimateTemperatureCommandTopic)
+		i.ExtraTopics.AddIfNotNull(e.SetMode, entity.ClimateModeCommandTopic)
+		i.ExtraTopics.AddIfNotNull(e.SetPresetMode, entity.ClimatePresetModeCommandTopic)
+
+		return i
+	})
+
 	s.register(entity.Entity{
-		Meta: observable.NewMapped(e.Meta, func(i entity.ClimateMeta) entity.Metadata {
-
-			i.ExtraTopics.AddIfNotNull(e.ActualTemperature, entity.ClimateCurrentTemperatureTopic)
-			i.ExtraTopics.AddIfNotNull(e.RequestedTemperature, entity.ClimateTemperatureStateTopic)
-			i.ExtraTopics.AddIfNotNull(e.Mode, entity.ClimateModeStateTopic)
-			i.ExtraTopics.AddIfNotNull(e.PresetMode, entity.ClimatePresetModeStateTopic)
-			i.ExtraTopics.AddIfNotNull(e.SetTemperature, entity.ClimateTemperatureCommandTopic)
-			i.ExtraTopics.AddIfNotNull(e.SetMode, entity.ClimateModeCommandTopic)
-			i.ExtraTopics.AddIfNotNull(e.SetPresetMode, entity.ClimatePresetModeCommandTopic)
-
-			return i
-		}),
+		Meta:       climateMeta,
 		Attributes: e.Attributes,
 	})
+
+	return climateMeta
 }
 
-func (s *EntityRegistry) monitorDecimal(meta entity.Metadata, temperature observable.Observable[decimal.Decimal], subTopic string) {
+func (s *EntityRegistry) monitorDecimal(meta observable.Observable[entity.Metadata], temperature observable.Observable[decimal.Decimal], subTopic string) {
 	if temperature == nil {
 		return
 	}
 
-	topic := s.fullTopic(meta, subTopic)
-
 	monitorObservable(s, meta, temperature, func(temp decimal.Decimal) error {
+		currentMeta := meta.Current()
+		topic := s.fullTopic(currentMeta, subTopic)
 		return s.nc.Publish(topic, []byte(temp.String()))
 	})
 }
 
-func (s *EntityRegistry) monitorString(meta entity.Metadata, str observable.Observable[string], subTopic string) {
+func (s *EntityRegistry) monitorString(meta observable.Observable[entity.Metadata], str observable.Observable[string], subTopic string) {
 	if str == nil {
 		return
 	}
 
-	topic := s.fullTopic(meta, subTopic)
-
 	monitorObservable(s, meta, str, func(value string) error {
+		currentMeta := meta.Current()
+		topic := s.fullTopic(currentMeta, subTopic)
 		return s.nc.Publish(topic, []byte(value))
 	})
 }
@@ -82,7 +87,7 @@ func (s *EntityRegistry) monitorDecimalCmd(meta entity.Metadata, set func(decima
 	})
 }
 
-func (s *EntityRegistry) monitorStringCmd(meta entity.ClimateMeta, set func(string) error, subTopic string) error {
+func (s *EntityRegistry) monitorStringCmd(meta entity.Metadata, set func(string) error, subTopic string) error {
 	if set == nil {
 		return nil
 	}

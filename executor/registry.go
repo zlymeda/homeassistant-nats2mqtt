@@ -3,13 +3,15 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/nats-io/nats.go"
-	"github.com/zlymeda/homeassistant-nats2mqtt/entity"
-	"github.com/zlymeda/homeassistant-nats2mqtt/observable"
 	"log/slog"
 	"strings"
 	"sync"
+
+	"github.com/nats-io/nats.go"
+	"github.com/zlymeda/homeassistant-nats2mqtt/entity"
+	"github.com/zlymeda/homeassistant-nats2mqtt/observable"
 )
 
 type EntityRegistry struct {
@@ -52,8 +54,8 @@ func (s *EntityRegistry) PublishDiscovery() error {
 			values[topic+"_t"] = natsTopicToMqtt(s.fullTopic(meta, topic))
 		}
 
-		platform := values["p"].(string)
-		uniqueId := values["uniq_id"].(string)
+		platform, _ := values["p"].(string)
+		uniqueId, _ := values["uniq_id"].(string)
 
 		path := fmt.Sprintf("%s.%s", platform, uniqueId)
 		entities[path] = values
@@ -77,6 +79,21 @@ func (s *EntityRegistry) PublishDiscovery() error {
 	}
 
 	return nil
+}
+
+// PublishStates publishes the current state of all entities.
+// Must be called while holding Service.mutex to protect the devices map,
+// and acquires EntityRegistry.mutex internally to protect publishState.
+func (s *EntityRegistry) PublishStates() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var errs error
+	for _, publish := range s.publishState {
+		errs = errors.Join(errs, publish())
+	}
+
+	return errs
 }
 
 func (s *EntityRegistry) monitorDiscovery(e entity.Entity) {
@@ -110,13 +127,14 @@ func (s *EntityRegistry) monitorState(e entity.Entity) {
 		return
 	}
 
-	meta := e.Meta.Current()
-	topic := s.stateTopic(meta)
+	meta := e.Meta
 
 	monitorObservable(s, meta, state, func(state string) error {
+		currentMeta := meta.Current()
+		topic := s.stateTopic(currentMeta)
 		err := s.nc.Publish(topic, []byte(state))
 		if err != nil {
-			return fmt.Errorf("error publishing new state for %s: %w", meta.GetName(), err)
+			return fmt.Errorf("error publishing new state for %s: %w", currentMeta.GetName(), err)
 		}
 		return nil
 	})
@@ -128,18 +146,19 @@ func (s *EntityRegistry) monitorAttributes(e entity.Entity) {
 		return
 	}
 
-	meta := e.Meta.Current()
-	topic := s.attrsTopic(meta)
+	meta := e.Meta
 
 	monitorObservable(s, meta, attributes, func(state entity.Attrs) error {
+		currentMeta := meta.Current()
+		topic := s.attrsTopic(currentMeta)
 		res, err := json.Marshal(state)
 		if err != nil {
-			return fmt.Errorf("error marshalling new attrs for %s: %w", meta.GetName(), err)
+			return fmt.Errorf("error marshalling new attrs for %s: %w", currentMeta.GetName(), err)
 		}
 
 		err = s.nc.Publish(topic, res)
 		if err != nil {
-			return fmt.Errorf("error publishing new attrs for %s: %w", meta.GetName(), err)
+			return fmt.Errorf("error publishing new attrs for %s: %w", currentMeta.GetName(), err)
 		}
 
 		return nil
@@ -155,7 +174,7 @@ func (s *EntityRegistry) attrsTopic(meta entity.Metadata) string {
 }
 
 func (s *EntityRegistry) fullTopic(meta entity.Metadata, subTopic string) string {
-	platform := meta.ToHaDiscovery(s.device)["p"].(string)
+	platform, _ := meta.ToHaDiscovery(s.device)["p"].(string)
 	return Topic(s.topicPrefix, platform, meta.GetId(), subTopic)
 }
 
@@ -171,12 +190,12 @@ func (s *EntityRegistry) register(e entity.Entity) {
 	s.stateUpdated()
 }
 
-func monitorObservable[T any](s *EntityRegistry, meta entity.Metadata, observable observable.Observable[T], publish func(state T) error) {
+func monitorObservable[T any](s *EntityRegistry, meta observable.Observable[entity.Metadata], obs observable.Observable[T], publish func(state T) error) {
 	s.publishState = append(s.publishState, func() error {
-		return publish(observable.Current())
+		return publish(obs.Current())
 	})
 
-	changes := observable.Changes()
+	changes := obs.Changes()
 	if changes == nil {
 		return
 	}
@@ -188,10 +207,11 @@ func monitorObservable[T any](s *EntityRegistry, meta entity.Metadata, observabl
 				return
 
 			case change := <-changes:
+				currentMeta := meta.Current()
 				err := publish(change)
 				if err != nil {
 					slog.Error("error publishing",
-						slog.String("name", meta.GetName()),
+						slog.String("name", currentMeta.GetName()),
 						slog.Any("value", change),
 						slog.Any("err", err),
 					)

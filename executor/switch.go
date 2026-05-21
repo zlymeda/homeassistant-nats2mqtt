@@ -28,7 +28,7 @@ func (s *EntityRegistry) AddSwitch(e *entity.Switch) error {
 	meta := switchMeta.Current()
 
 	cmdTopic := s.fullTopic(meta, entity.CommandTopic)
-	if err := s.monitorCommandsOn(cmdTopic, createCallback(commands)); err != nil {
+	if err := s.monitorCommandsOn(cmdTopic, createCallback("switch", commands)); err != nil {
 		return err
 	}
 

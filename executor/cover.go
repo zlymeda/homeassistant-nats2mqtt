@@ -31,7 +31,7 @@ func (s *EntityRegistry) AddCover(e *entity.Cover) error {
 
 	meta := coverMeta.Current()
 	cmdTopic := s.fullTopic(meta, entity.CommandTopic)
-	if err := s.monitorCommandsOn(cmdTopic, createCallback(commands)); err != nil {
+	if err := s.monitorCommandsOn(cmdTopic, createCallback("cover", commands)); err != nil {
 		return err
 	}
 

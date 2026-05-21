@@ -40,7 +40,7 @@ func (s *EntityRegistry) AddAlarm(e *entity.Alarm) error {
 	meta := alarmMeta.Current()
 
 	cmdTopic := s.fullTopic(meta, entity.CommandTopic)
-	if err := s.monitorCommandsOn(cmdTopic, createCallback(commands)); err != nil {
+	if err := s.monitorCommandsOn(cmdTopic, createCallback("alarm", commands)); err != nil {
 		return err
 	}
 

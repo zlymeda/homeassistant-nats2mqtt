@@ -3,12 +3,12 @@ package executor
 import (
 	"context"
 	"errors"
-	"github.com/nats-io/nats.go"
 	"log/slog"
-	"math/rand"
-
+	"math/rand/v2"
 	"sync"
 	"time"
+
+	"github.com/nats-io/nats.go"
 )
 
 func New(ctx context.Context, origin Origin, nc *nats.Conn) *Service {
@@ -35,19 +35,13 @@ type Service struct {
 }
 
 func (s *Service) Start() {
-	retry := make(chan struct{})
+	retry := make(chan struct{}, 1)
 
 	doRetry := func() {
 		select {
-		case <-s.ctx.Done():
-			return
-
 		case retry <- struct{}{}:
-
 		default:
-			return
 		}
-
 	}
 
 	publishStates := func() {
@@ -58,9 +52,9 @@ func (s *Service) Start() {
 	}
 
 	publishDiscovery := func() {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			if err := s.PublishDiscovery(); err != nil {
-				slog.Error("publishing discovery", slog.Any("err", err))
+				slog.Error("publishing discovery", slog.Any("err", err), slog.Int("attempt", i+1))
 				microSleep()
 				continue
 			}
@@ -80,7 +74,8 @@ func (s *Service) Start() {
 			return
 		}
 
-		publishDiscovery()
+		// Run in a separate goroutine to avoid blocking the NATS message handler.
+		go publishDiscovery()
 	})
 
 	publishDiscovery()
@@ -122,14 +117,12 @@ func (s *Service) PublishStates() error {
 
 	var errs error
 	for _, dev := range s.devices {
-		for _, publish := range dev.publishState {
-			errs = errors.Join(errs, publish())
-		}
+		errs = errors.Join(errs, dev.PublishStates())
 	}
 
 	return errs
 }
 
 func microSleep() {
-	time.Sleep((400 + time.Duration(rand.Int31n(300))) * time.Millisecond)
+	time.Sleep((400 + time.Duration(rand.IntN(300))) * time.Millisecond)
 }

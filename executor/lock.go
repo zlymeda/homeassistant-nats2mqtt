@@ -26,7 +26,7 @@ func (s *EntityRegistry) AddLock(e *entity.Lock) error {
 	meta := lockMeta.Current()
 
 	cmdTopic := s.fullTopic(meta, entity.CommandTopic)
-	if err := s.monitorCommandsOn(cmdTopic, createCallback(commands)); err != nil {
+	if err := s.monitorCommandsOn(cmdTopic, createCallback("lock", commands)); err != nil {
 		return err
 	}
 

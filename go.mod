@@ -1,16 +1,16 @@
 module github.com/zlymeda/homeassistant-nats2mqtt
 
-go 1.25
+go 1.26.3
 
 require (
-	github.com/nats-io/nats.go v1.48.0
+	github.com/nats-io/nats.go v1.52.0
 	github.com/shopspring/decimal v1.4.0
 )
 
 require (
-	github.com/klauspost/compress v1.18.3 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 )

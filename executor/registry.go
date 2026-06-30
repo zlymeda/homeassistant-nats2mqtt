@@ -23,7 +23,8 @@ type EntityRegistry struct {
 
 	entities []entity.Entity
 
-	topicPrefix string
+	topicPrefix    string
+	rawStatePrefix string
 
 	publishState []func() error
 	origin       Origin
@@ -136,6 +137,9 @@ func (s *EntityRegistry) monitorState(e entity.Entity) {
 		if err != nil {
 			return fmt.Errorf("error publishing new state for %s: %w", currentMeta.GetName(), err)
 		}
+		if err := s.publishRaw(currentMeta, "state", []byte(state)); err != nil {
+			return fmt.Errorf("error publishing raw state for %s: %w", currentMeta.GetName(), err)
+		}
 		return nil
 	})
 }
@@ -160,6 +164,9 @@ func (s *EntityRegistry) monitorAttributes(e entity.Entity) {
 		if err != nil {
 			return fmt.Errorf("error publishing new attrs for %s: %w", currentMeta.GetName(), err)
 		}
+		if err := s.publishRaw(currentMeta, "attrs", res); err != nil {
+			return fmt.Errorf("error publishing raw attrs for %s: %w", currentMeta.GetName(), err)
+		}
 
 		return nil
 	})
@@ -176,6 +183,18 @@ func (s *EntityRegistry) attrsTopic(meta entity.Metadata) string {
 func (s *EntityRegistry) fullTopic(meta entity.Metadata, subTopic string) string {
 	platform, _ := meta.ToHaDiscovery(s.device)["p"].(string)
 	return Topic(s.topicPrefix, platform, meta.GetId(), subTopic)
+}
+
+func (s *EntityRegistry) rawTopic(meta entity.Metadata, subTopic string) string {
+	platform, _ := meta.ToHaDiscovery(s.device)["p"].(string)
+	return Topic(s.rawStatePrefix, s.origin.Name, s.device.Id, platform, meta.GetId(), subTopic)
+}
+
+func (s *EntityRegistry) publishRaw(meta entity.Metadata, subTopic string, data []byte) error {
+	if s.rawStatePrefix == "" {
+		return nil
+	}
+	return s.nc.Publish(s.rawTopic(meta, subTopic), data)
 }
 
 func (s *EntityRegistry) register(e entity.Entity) {

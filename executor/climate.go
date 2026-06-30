@@ -55,7 +55,11 @@ func (s *EntityRegistry) monitorDecimal(meta observable.Observable[entity.Metada
 	monitorObservable(s, meta, temperature, func(temp decimal.Decimal) error {
 		currentMeta := meta.Current()
 		topic := s.fullTopic(currentMeta, subTopic)
-		return s.nc.Publish(topic, []byte(temp.String()))
+		data := []byte(temp.String())
+		if err := s.nc.Publish(topic, data); err != nil {
+			return err
+		}
+		return s.publishRaw(currentMeta, subTopic, data)
 	})
 }
 
@@ -67,7 +71,11 @@ func (s *EntityRegistry) monitorString(meta observable.Observable[entity.Metadat
 	monitorObservable(s, meta, str, func(value string) error {
 		currentMeta := meta.Current()
 		topic := s.fullTopic(currentMeta, subTopic)
-		return s.nc.Publish(topic, []byte(value))
+		data := []byte(value)
+		if err := s.nc.Publish(topic, data); err != nil {
+			return err
+		}
+		return s.publishRaw(currentMeta, subTopic, data)
 	})
 }
 

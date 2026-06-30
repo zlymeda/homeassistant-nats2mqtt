@@ -11,14 +11,26 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-func New(ctx context.Context, origin Origin, nc *nats.Conn) *Service {
-	return &Service{
+type Option func(*Service)
+
+func WithRawStatePrefix(prefix string) Option {
+	return func(s *Service) {
+		s.rawStatePrefix = prefix
+	}
+}
+
+func New(ctx context.Context, origin Origin, nc *nats.Conn, opts ...Option) *Service {
+	s := &Service{
 		ctx:     ctx,
 		nc:      nc,
 		origin:  origin,
 		devices: map[string]*EntityRegistry{},
 		updates: make(chan struct{}, 1),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 type Service struct {
@@ -26,6 +38,8 @@ type Service struct {
 	nc  *nats.Conn
 
 	origin Origin
+
+	rawStatePrefix string
 
 	mutex sync.Mutex
 

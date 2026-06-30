@@ -19,11 +19,12 @@ func (s *Service) AddDevice(device entity.Device) *EntityRegistry {
 	defer s.mutex.Unlock()
 
 	s.devices[device.Id] = &EntityRegistry{
-		ctx:         s.ctx,
-		nc:          s.nc,
-		device:      device,
-		topicPrefix: Topic(s.origin.Name, device.Id),
-		origin:      s.origin,
+		ctx:            s.ctx,
+		nc:             s.nc,
+		device:         device,
+		topicPrefix:    Topic(s.origin.Name, device.Id),
+		origin:         s.origin,
+		rawStatePrefix: s.rawStatePrefix,
 		stateUpdated: func() {
 			s.stateUpdated()
 		},

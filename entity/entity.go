@@ -27,6 +27,8 @@ type Entity struct {
 type Meta struct {
 	Id             string
 	Name           string
+	ObjectId       string
+	UniqueId       string
 	DeviceClass    DeviceClass
 	StateClass     StateClass
 	Icon           string
@@ -35,11 +37,20 @@ type Meta struct {
 }
 
 func (m Meta) ToHaDiscovery(dev Device, platform string) map[string]any {
+	objectId := m.ObjectId
+	if objectId == "" {
+		objectId = fmt.Sprintf("%s_%s", dev.Name, m.Id)
+	}
+	uniqueId := m.UniqueId
+	if uniqueId == "" {
+		uniqueId = fmt.Sprintf("%s_%s", dev.Id, m.Id)
+	}
+
 	result := map[string]any{
 		"p":       platform,
 		"name":    m.Name,
-		"obj_id":  fmt.Sprintf("%s_%s", dev.Name, m.Id),
-		"uniq_id": fmt.Sprintf("%s_%s", dev.Id, m.Id),
+		"obj_id":  objectId,
+		"uniq_id": uniqueId,
 	}
 
 	if m.DeviceClass != "" {

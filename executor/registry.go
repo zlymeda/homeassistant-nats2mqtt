@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/zlymeda/homeassistant-nats2mqtt/entity"
@@ -130,6 +131,13 @@ func (s *EntityRegistry) monitorState(e entity.Entity) {
 
 	meta := e.Meta
 
+	if meta.Current().IsMqttOnly() {
+		if mutable, ok := state.(observable.Mutable[string]); ok {
+			s.monitorMqttOnlyState(meta, mutable)
+		}
+		return
+	}
+
 	monitorObservable(s, meta, state, func(state string) error {
 		currentMeta := meta.Current()
 		topic := s.stateTopic(currentMeta)
@@ -139,6 +147,58 @@ func (s *EntityRegistry) monitorState(e entity.Entity) {
 		}
 		if err := s.publishRaw(currentMeta, "state", []byte(state)); err != nil {
 			return fmt.Errorf("error publishing raw state for %s: %w", currentMeta.GetName(), err)
+		}
+		return nil
+	})
+}
+
+func (s *EntityRegistry) monitorMqttOnlyState(meta observable.Observable[entity.Metadata], state observable.Mutable[string]) {
+	currentMeta := meta.Current()
+	topic := s.stateTopic(currentMeta)
+	received := make(chan struct{}, 1)
+
+	sub, err := s.nc.Subscribe(topic, func(msg *nats.Msg) {
+		state.Mutate(string(msg.Data))
+		select {
+		case received <- struct{}{}:
+		default:
+		}
+	})
+	if err != nil {
+		slog.Error("failed to subscribe to mqtt-only state topic",
+			slog.String("topic", topic), slog.Any("error", err))
+		s.publishState = append(s.publishState, func() error {
+			return s.nc.Publish(topic, []byte(state.Current()))
+		})
+		return
+	}
+
+	// Ask the bridge to re-deliver any retained MQTT value.
+	if err := s.nc.Publish("mqtt-retained."+topic, []byte{}); err != nil {
+		slog.Error("failed to request retained value",
+			slog.String("topic", topic), slog.Any("error", err))
+	}
+
+	// If nothing arrives, publish the code default. Unsubscribe after either path.
+	go func() {
+		select {
+		case <-received:
+		case <-time.After(2 * time.Second):
+			if err := s.nc.Publish(topic, []byte(state.Current())); err != nil {
+				slog.Error("failed to publish default state",
+					slog.String("topic", topic), slog.Any("error", err))
+			}
+		}
+		_ = sub.Unsubscribe()
+	}()
+
+	monitorChanges(s, meta, state, func(val string) error {
+		t := s.stateTopic(meta.Current())
+		if err := s.nc.Publish(t, []byte(val)); err != nil {
+			return err
+		}
+		if err := s.publishRaw(meta.Current(), "state", []byte(val)); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -214,6 +274,10 @@ func monitorObservable[T any](s *EntityRegistry, meta observable.Observable[enti
 		return publish(obs.Current())
 	})
 
+	monitorChanges(s, meta, obs, publish)
+}
+
+func monitorChanges[T any](s *EntityRegistry, meta observable.Observable[entity.Metadata], obs observable.Observable[T], publish func(state T) error) {
 	changes := obs.Changes()
 	if changes == nil {
 		return

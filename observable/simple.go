@@ -42,6 +42,10 @@ func (s *Simple[T]) Change(state T) {
 	}
 }
 
+func (s *Simple[T]) Mutate(state T) {
+	s.Change(state)
+}
+
 func (s *Simple[T]) Current() T {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()

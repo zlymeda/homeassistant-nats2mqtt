@@ -144,12 +144,22 @@ func (s *EntityRegistry) monitorState(e entity.Entity) {
 	meta := e.Meta
 
 	if meta.Current().IsMqttOnly() {
-		if mutable, ok := state.(observable.Mutable[string]); ok {
-			s.monitorMqttOnlyState(meta, mutable)
+		// Find the command topic (if any) so retained-value restoration
+		// can route through the Set callback instead of raw Mutate.
+		var cmdTopic string
+		for _, t := range meta.Current().GetExtraTopics() {
+			if t == entity.CommandTopic {
+				cmdTopic = s.fullTopic(meta.Current(), t)
+				break
+			}
 		}
-		return
+		if mutable, ok := state.(observable.Mutable[string]); ok {
+			s.monitorMqttOnlyState(meta, mutable, cmdTopic)
+			return
+		}
+		slog.Warn("MqttOnly entity state does not implement Mutable[string], falling back to normal monitoring",
+			"entity", meta.Current().GetName())
 	}
-
 	monitorObservable(s, meta, state, func(state string) error {
 		currentMeta := meta.Current()
 		topic := s.stateTopic(currentMeta)
@@ -164,13 +174,29 @@ func (s *EntityRegistry) monitorState(e entity.Entity) {
 	})
 }
 
-func (s *EntityRegistry) monitorMqttOnlyState(meta observable.Observable[entity.Metadata], state observable.Mutable[string]) {
+// monitorMqttOnlyState handles MqttOnly entities by subscribing to the state
+// topic and requesting the bridge to re-deliver any retained MQTT value.
+//
+// When cmdTopic is non-empty (i.e. the entity has a Set callback), retained
+// values are forwarded there so the consumer's Set callback fires — this lets
+// the consumer update its own internal state (settings, caches, etc.) rather
+// than only updating the observable via Mutate.
+func (s *EntityRegistry) monitorMqttOnlyState(meta observable.Observable[entity.Metadata], state observable.Mutable[string], cmdTopic string) {
 	currentMeta := meta.Current()
 	topic := s.stateTopic(currentMeta)
 	received := make(chan struct{}, 1)
 
 	sub, err := s.nc.Subscribe(topic, func(msg *nats.Msg) {
-		state.Mutate(string(msg.Data))
+		if cmdTopic != "" {
+			// Route through the command topic so the Set callback fires,
+			// which lets the consumer update its own settings/state.
+			if err := s.nc.Publish(cmdTopic, msg.Data); err != nil {
+				slog.Error("failed to forward retained value to cmd topic",
+					slog.String("topic", cmdTopic), slog.Any("error", err))
+			}
+		} else {
+			state.Mutate(string(msg.Data))
+		}
 		select {
 		case received <- struct{}{}:
 		default:

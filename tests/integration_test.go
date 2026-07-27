@@ -87,7 +87,7 @@ func TestMqttOnlyNumberEntity_RetainedValue(t *testing.T) {
 			},
 		}),
 		State: state,
-		Set:   func(d decimal.Decimal) error { return nil },
+		Set:   func(d decimal.Decimal) error { state.Change(d); return nil },
 	}
 
 	err = reg.AddNumber(num)
@@ -121,7 +121,7 @@ func TestMqttOnlyNumberEntity_NoRetainedValue(t *testing.T) {
 			},
 		}),
 		State: state,
-		Set:   func(d decimal.Decimal) error { return nil },
+		Set:   func(d decimal.Decimal) error { state.Change(d); return nil },
 	}
 
 	err := reg.AddNumber(num)
@@ -165,7 +165,7 @@ func TestMqttOnlySelectEntity(t *testing.T) {
 			Options: []string{"off", "auto", "always_on"},
 		}),
 		State: state,
-		Set:   func(s string) error { return nil },
+		Set:   func(s string) error { state.Change(s); return nil },
 	}
 
 	err = reg.AddSelect(selectEnt)
@@ -200,7 +200,7 @@ func TestStandardNumberEntity_PublishesInitialState(t *testing.T) {
 			},
 		}),
 		State: state,
-		Set:   func(d decimal.Decimal) error { return nil },
+		Set:   func(d decimal.Decimal) error { state.Change(d); return nil },
 	}
 
 	err := reg.AddNumber(num)
@@ -301,7 +301,7 @@ func TestMultipleMqttOnlyEntities(t *testing.T) {
 			},
 		}),
 		State: state1,
-		Set:   func(d decimal.Decimal) error { return nil },
+		Set:   func(d decimal.Decimal) error { state1.Change(d); return nil },
 	}
 
 	state2 := observable.NewSimple[decimal.Decimal](context.Background(), decimal.RequireFromString("0"))
@@ -315,7 +315,7 @@ func TestMultipleMqttOnlyEntities(t *testing.T) {
 			},
 		}),
 		State: state2,
-		Set:   func(d decimal.Decimal) error { return nil },
+		Set:   func(d decimal.Decimal) error { state2.Change(d); return nil },
 	}
 
 	err = reg.AddNumber(num1)

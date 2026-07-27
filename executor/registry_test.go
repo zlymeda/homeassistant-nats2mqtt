@@ -86,7 +86,7 @@ func TestMonitorMqttOnlyState_RetainedValuePublishesInitialValue(t *testing.T) {
 	}
 
 	// Start monitoring
-	reg.monitorMqttOnlyState(meta, state)
+	reg.monitorMqttOnlyState(meta, state, "")
 
 	// Wait for retained value to arrive
 	time.Sleep(500 * time.Millisecond)
@@ -124,7 +124,7 @@ func TestMonitorMqttOnlyState_NoRetainedValue(t *testing.T) {
 	}
 
 	// Start monitoring
-	reg.monitorMqttOnlyState(meta, state)
+	reg.monitorMqttOnlyState(meta, state, "")
 
 	// Wait for default value to be published (2s timeout + 100ms buffer)
 	time.Sleep(2500 * time.Millisecond)
@@ -161,7 +161,7 @@ func TestMonitorMqttOnlyState_ImmediateRetainedValue(t *testing.T) {
 	}
 
 	// Start monitoring - triggers retained request
-	reg.monitorMqttOnlyState(meta, state)
+	reg.monitorMqttOnlyState(meta, state, "")
 
 	// Wait for retained value to arrive
 	time.Sleep(500 * time.Millisecond)

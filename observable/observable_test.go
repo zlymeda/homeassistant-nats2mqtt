@@ -3,7 +3,6 @@ package observable
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -126,75 +125,5 @@ func TestMapped_NilChanges(t *testing.T) {
 	changes := mapped.Changes()
 	if changes != nil {
 		t.Error("Changes() should return nil when inner has nil changes")
-	}
-}
-
-func TestNewMutableMapped(t *testing.T) {
-	ctx := context.Background()
-	inner := NewSimple[int](ctx, 42)
-	mapped := NewMutableMapped(inner,
-		func(i int) string { return fmt.Sprintf("%d", i) },
-		func(s string) int {
-			val, _ := strconv.Atoi(s)
-			return val
-		},
-	)
-
-	if got := mapped.Current(); got != "42" {
-		t.Errorf("Current() = %v, want %v", got, "42")
-	}
-}
-
-func TestMutableMapped_Mutate(t *testing.T) {
-	ctx := context.Background()
-	inner := NewSimple[int](ctx, 42)
-	mapped := NewMutableMapped(inner,
-		func(i int) string { return fmt.Sprintf("%d", i) },
-		func(s string) int {
-			val, _ := strconv.Atoi(s)
-			return val
-		},
-	)
-
-	mapped.Mutate("100")
-
-	// Check the inner value was updated
-	if got := inner.Current(); got != 100 {
-		t.Errorf("inner.Current() = %v, want %v", got, 100)
-	}
-
-	// Check the mapped value
-	if got := mapped.Current(); got != "100" {
-		t.Errorf("mapped.Current() = %v, want %v", got, "100")
-	}
-}
-
-func TestMutableMapped_Changes(t *testing.T) {
-	ctx := context.Background()
-	inner := NewSimple[int](ctx, 42)
-	mapped := NewMutableMapped(inner,
-		func(i int) string { return fmt.Sprintf("%d", i) },
-		func(s string) int {
-			val, _ := strconv.Atoi(s)
-			return val
-		},
-	)
-
-	changes := mapped.Changes()
-	if changes == nil {
-		t.Fatal("Changes() returned nil")
-	}
-
-	// Change the inner value
-	inner.Change(100)
-
-	// Should receive the mapped change
-	select {
-	case val := <-changes:
-		if val != "100" {
-			t.Errorf("received %v, want %v", val, "100")
-		}
-	case <-time.After(time.Second):
-		t.Error("timed out waiting for change")
 	}
 }

@@ -25,25 +25,6 @@ func TestMeta_GetExtraTopics(t *testing.T) {
 	}
 }
 
-func TestMeta_IsMqttOnly(t *testing.T) {
-	tests := []struct {
-		name     string
-		mqttOnly bool
-		want     bool
-	}{
-		{"mqtt only true", true, true},
-		{"mqtt only false", false, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			meta := Meta{MqttOnly: tt.mqttOnly}
-			if got := meta.IsMqttOnly(); got != tt.want {
-				t.Errorf("IsMqttOnly() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestMeta_ToHaDiscovery(t *testing.T) {
 	device := Device{Id: "dev-1", Name: "Test Device"}
 

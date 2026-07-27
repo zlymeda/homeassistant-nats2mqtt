@@ -20,15 +20,18 @@ func (s *EntityRegistry) AddNumber(e *entity.Number) error {
 		})
 	}
 
+	if err := s.monitorDecimalCmd(e.Meta.Current(), e.Set, entity.CommandTopic); err != nil {
+		return err
+	}
+
 	s.register(entity.Entity{
 		Meta: observable.NewMapped(e.Meta, func(i entity.NumberMeta) entity.Metadata {
 			i.ExtraTopics.AddIfNotNull(e.Set, entity.CommandTopic)
-
 			return i
 		}),
 		State:      stateObs,
 		Attributes: e.Attributes,
 	})
 
-	return s.monitorDecimalCmd(e.Meta.Current(), e.Set, entity.CommandTopic)
+	return nil
 }

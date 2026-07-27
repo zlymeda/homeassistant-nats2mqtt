@@ -16,6 +16,7 @@ type Metadata interface {
 	GetName() string
 	GetExtraTopics() []string
 	ToHaDiscovery(dev Device) map[string]any
+	IsMqttOnly() bool
 }
 
 type Entity struct {
@@ -34,7 +35,13 @@ type Meta struct {
 	Icon           string
 	Unit           string
 	EntityCategory Category
+	MqttOnly       bool
 }
+
+func (m Meta) GetId() string            { return m.Id }
+func (m Meta) GetName() string          { return m.Name }
+func (m Meta) GetExtraTopics() []string { return nil }
+func (m Meta) IsMqttOnly() bool         { return m.MqttOnly }
 
 func (m Meta) ToHaDiscovery(dev Device, platform string) map[string]any {
 	objectId := m.ObjectId

@@ -33,6 +33,18 @@ type EntityRegistry struct {
 	stateUpdated func()
 }
 
+func NewEntityRegistry(ctx context.Context, nc *nats.Conn, device entity.Device, origin Origin, topicPrefix string, rawStatePrefix string) *EntityRegistry {
+	return &EntityRegistry{
+		ctx:            ctx,
+		nc:             nc,
+		device:         device,
+		topicPrefix:    topicPrefix,
+		rawStatePrefix: rawStatePrefix,
+		origin:         origin,
+		stateUpdated:   func() {},
+	}
+}
+
 func (s *EntityRegistry) PublishDiscovery() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

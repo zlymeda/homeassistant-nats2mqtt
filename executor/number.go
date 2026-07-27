@@ -7,15 +7,26 @@ import (
 )
 
 func (s *EntityRegistry) AddNumber(e *entity.Number) error {
+	// Build a state observable that preserves mutability when the source is mutable.
+	// This is needed for MqttOnly entities which require Mutable[string] to receive updates.
+	var stateObs observable.Observable[string]
+	if mutable, ok := e.State.(observable.Mutable[decimal.Decimal]); ok {
+		stateObs = observable.NewMutableMapped(mutable,
+			func(d decimal.Decimal) string { return d.String() },
+			func(s string) decimal.Decimal { return decimal.RequireFromString(s) })
+	} else {
+		stateObs = observable.NewMapped(e.State, func(d decimal.Decimal) string {
+			return d.String()
+		})
+	}
+
 	s.register(entity.Entity{
 		Meta: observable.NewMapped(e.Meta, func(i entity.NumberMeta) entity.Metadata {
 			i.ExtraTopics.AddIfNotNull(e.Set, entity.CommandTopic)
 
 			return i
 		}),
-		State: observable.NewMapped(e.State, func(i decimal.Decimal) string {
-			return i.String()
-		}),
+		State:      stateObs,
 		Attributes: e.Attributes,
 	})
 

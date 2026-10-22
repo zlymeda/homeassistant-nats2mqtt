@@ -14,6 +14,10 @@ import (
 	"github.com/zlymeda/homeassistant-nats2mqtt/observable"
 )
 
+// retainHeader is read by the NATS to MQTT bridge, which publishes the message
+// with the MQTT retain flag set.
+const retainHeader = "X-MQTT-Retain"
+
 type EntityRegistry struct {
 	ctx    context.Context
 	nc     *nats.Conn
@@ -86,7 +90,13 @@ func (s *EntityRegistry) PublishDiscovery() error {
 
 	// <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
 	configTopic := Topic("homeassistant", "device", s.origin.Name, devId, "config")
-	err = s.nc.Publish(configTopic, cfg)
+	// Retained, so Home Assistant rebuilds the entities after its own restart
+	// without waiting for this service to announce them again.
+	err = s.nc.PublishMsg(&nats.Msg{
+		Subject: configTopic,
+		Data:    cfg,
+		Header:  nats.Header{retainHeader: []string{"true"}},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to publish device %s config: %w", devId, err)
 	}
